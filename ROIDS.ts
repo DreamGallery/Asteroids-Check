@@ -3,7 +3,7 @@ interface Query {
   variables: Record<string, unknown>;
 }
 
-interface ResponseAtom {
+interface ResponseBalance {
   balances: Array<{
     denom: string;
     amount: string;
@@ -14,7 +14,7 @@ interface ResponseAtom {
   };
 }
 
-interface ResponseRoids {
+interface ResponseTokenHolder {
   data: {
     token_holder: Array<{
       token: {
@@ -34,7 +34,7 @@ interface ResponseRoids {
   };
 }
 
-interface ResponseList {
+interface ResponseOpenPosition {
   data: {
     token_open_position: Array<{
       id: number;
@@ -45,10 +45,10 @@ interface ResponseList {
   };
 }
 
-async function postJson(
+async function postJson<T>(
   url: string,
   data: Query
-): Promise<ResponseRoids | ResponseList | string> {
+): Promise<T | string> {
   try {
     const options: RequestInit = {
       method: "post",
@@ -59,7 +59,7 @@ async function postJson(
     };
     const response = await fetch(url, options);
     const content = await response.text();
-    const json = JSON.parse(content) as ResponseRoids | ResponseList;
+    const json = JSON.parse(content) as T;
     return json;
   } catch (err) {
     if (err instanceof Error) {
@@ -70,7 +70,7 @@ async function postJson(
   }
 }
 
-async function getJson(url: string): Promise<ResponseAtom | string> {
+async function getJson(url: string): Promise<ResponseBalance | string> {
   try {
     const options: RequestInit = {
       method: "GET",
@@ -80,11 +80,11 @@ async function getJson(url: string): Promise<ResponseAtom | string> {
     };
     const response = await fetch(url, options);
     const content = await response.text();
-    const json = JSON.parse(content) as ResponseAtom;
+    const json = JSON.parse(content) as ResponseBalance;
     return json;
   } catch (err) {
     if (err instanceof Error) {
-      return "Error posting data: " + err.message;
+      return "Error getting data: " + err.message;
     } else {
       return "Unknown error: " + err;
     }
@@ -114,7 +114,7 @@ async function getRoidsBalance(address: string): Promise<number | string> {
       }`,
       variables: {},
     };
-    const response = await postJson(url, query) as ResponseRoids;
+    const response = await postJson(url, query) as ResponseTokenHolder;
     let roidsAmount: number | null = null;
     if (
       typeof response === "object" &&
@@ -129,11 +129,11 @@ async function getRoidsBalance(address: string): Promise<number | string> {
       }
     }
     if (roidsAmount === null) {
-      return "Error getting data";
+      return "No ROIDS balance found";
     }
     return roidsAmount / 1000000;
   } catch (err) {
-    return "Error getting data: " + err.status;
+    return "Error posting data: " + err.status;
   }
 }
 
@@ -151,7 +151,7 @@ async function getListBalance(address: string): Promise<number | string> {
       }`,
       variables: {},
     };
-    const response = await postJson(url, query) as ResponseList;
+    const response = await postJson(url, query) as ResponseOpenPosition;
     let listAmount: number | null = null;
     if (
       typeof response === "object" &&
@@ -159,6 +159,7 @@ async function getListBalance(address: string): Promise<number | string> {
       response.data.token_open_position
     ) {
       if (response.data.token_open_position.length) {
+        listAmount = 0
         for (const open_position of response.data.token_open_position) {
           if (open_position.amount) {
             listAmount += open_position.amount;
@@ -170,11 +171,11 @@ async function getListBalance(address: string): Promise<number | string> {
       }
     }
     if (listAmount === null) {
-      return "Error getting data";
+      return "No listed ROIDS balance found";
     }
     return listAmount / 1000000;
   } catch (err) {
-    return "Error getting data: " + err.status;
+    return "Error posting data: " + err.status;
   }
 }
 
@@ -192,7 +193,7 @@ async function getAtomBalance(address: string) {
       }
     }
     if (atomAmount === null) {
-      return "Error: no uatom found";
+      return "No uatom balance found";
     }
     return (atomAmount / 1000000).toFixed(4);
   } catch (err) {
